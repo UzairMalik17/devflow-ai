@@ -8,7 +8,7 @@ type SubmissionState =
   | { status: "success"; message: string }
   | { status: "error"; message: string };
 
-export function RepositoryForm() {
+export const RepositoryForm = () => {
   const [repositoryUrl, setRepositoryUrl] = useState("");
   const [submissionState, setSubmissionState] = useState<SubmissionState>({
     status: "idle",
@@ -92,4 +92,4 @@ export function RepositoryForm() {
         )}
     </form>
   );
-}
+};

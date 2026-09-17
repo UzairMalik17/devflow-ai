@@ -5,9 +5,11 @@ import {
   parseRepositoryUrl,
 } from "@/features/repositories/repository.utils";
 import {
+  downloadGitHubRepositoryArchive,
   getGitHubRepository,
   GitHubRepositoryError,
 } from "@/features/repositories/github.repository";
+import { readRepositoryArchive } from "@/features/repositories/repository.archive";
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -39,6 +41,14 @@ export async function POST(request: Request) {
       repositoryReference.owner,
       repositoryReference.name,
     );
+
+    const archive = await downloadGitHubRepositoryArchive(
+      repository.owner,
+      repository.name,
+      repository.defaultBranch,
+    );
+
+    await readRepositoryArchive(archive);
 
     return NextResponse.json({
       message: "Repository verified successfully.",
