@@ -30,10 +30,6 @@ export function readRepositoryArchive(
 
         try {
           const path = entry.fileName.split("/").slice(1).join("/");
-          console.log({
-            path,
-            allowed: isRepositoryFileAllowed(path),
-          });
           if (!isRepositoryFileAllowed(path)) {
             zipFile.readEntry();
             return;
