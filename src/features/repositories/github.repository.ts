@@ -39,6 +39,7 @@ export async function getGitHubRepository(
       {
         headers: {
           Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2026-03-10",
         },
         cache: "no-store",
       },
@@ -81,4 +82,43 @@ export async function getGitHubRepository(
     defaultBranch: result.data.default_branch,
     htmlUrl: result.data.html_url,
   };
+}
+
+export async function downloadGitHubRepositoryArchive(
+  owner: string,
+  name: string,
+  branch: string,
+): Promise<ArrayBuffer> {
+  let response: Response;
+
+  try {
+    response = await fetch(
+      `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}/zipball/${encodeURIComponent(branch)}`,
+      {
+        headers: {
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2026-03-10",
+        },
+        cache: "no-store",
+      },
+    );
+  } catch {
+    throw new GitHubRepositoryError("Unable to reach GitHub.", 503);
+  }
+
+  if (!response.ok) {
+    throw new GitHubRepositoryError(
+      "GitHub repository archive request failed.",
+      response.status,
+    );
+  }
+
+  try {
+    return await response.arrayBuffer();
+  } catch {
+    throw new GitHubRepositoryError(
+      "Unable to read the GitHub repository archive.",
+      502,
+    );
+  }
 }
