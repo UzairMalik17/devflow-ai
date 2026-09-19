@@ -10,6 +10,7 @@ import {
   GitHubRepositoryError,
 } from "@/features/repositories/github.repository";
 import { readRepositoryArchive } from "@/features/repositories/repository.archive";
+import { chunkRepositoryFile } from "@/features/repositories/repository.chunk";
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -48,11 +49,14 @@ export async function POST(request: Request) {
       repository.defaultBranch,
     );
 
-    await readRepositoryArchive(archive);
+    const files = await readRepositoryArchive(archive);
+    files.flatMap((file) => chunkRepositoryFile(file));
 
     return NextResponse.json({
-      message: "Repository verified successfully.",
-      repository,
+      repository: {
+        owner: repository.owner,
+        name: repository.name,
+      },
     });
   } catch (error) {
     if (error instanceof GitHubRepositoryError) {
