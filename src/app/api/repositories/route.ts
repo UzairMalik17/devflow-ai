@@ -11,6 +11,8 @@ import {
 } from "@/features/repositories/github.repository";
 import { readRepositoryArchive } from "@/features/repositories/repository.archive";
 import { chunkRepositoryFile } from "@/features/repositories/repository.chunk";
+import { findRepositoryByFullName } from "@/features/repositories/repository.service";
+import { saveRepositoryWithChunks } from "@/features/repositories/repository.service";
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -43,6 +45,20 @@ export async function POST(request: Request) {
       repositoryReference.name,
     );
 
+    const existingRepository = await findRepositoryByFullName(
+      repository.fullName,
+    );
+
+    if (existingRepository) {
+      return NextResponse.json({
+        message: "Repository already exists.",
+        repository: {
+          owner: existingRepository.owner,
+          name: existingRepository.name,
+        },
+      });
+    }
+
     const archive = await downloadGitHubRepositoryArchive(
       repository.owner,
       repository.name,
@@ -50,12 +66,18 @@ export async function POST(request: Request) {
     );
 
     const files = await readRepositoryArchive(archive);
-    files.flatMap((file) => chunkRepositoryFile(file));
+    const chunks = files.flatMap((file) => chunkRepositoryFile(file));
+
+    const createdRepository = await saveRepositoryWithChunks(
+      repository,
+      chunks,
+    );
 
     return NextResponse.json({
+      message: "Repository ingested successfully.",
       repository: {
-        owner: repository.owner,
-        name: repository.name,
+        owner: createdRepository.owner,
+        name: createdRepository.name,
       },
     });
   } catch (error) {

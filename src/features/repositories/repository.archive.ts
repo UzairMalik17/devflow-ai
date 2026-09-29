@@ -37,6 +37,11 @@ export function readRepositoryArchive(
 
           const content = await readZipEntry(zipFile, entry);
 
+          if (content === null) {
+            zipFile.readEntry();
+            return;
+          }
+
           files.push({
             path,
             content,
@@ -61,7 +66,7 @@ export function readRepositoryArchive(
 function readZipEntry(
   zipFile: yauzl.ZipFile,
   entry: yauzl.Entry,
-): Promise<string> {
+): Promise<string | null> {
   return new Promise((resolve, reject) => {
     zipFile.openReadStream(entry, (error, readStream) => {
       if (error || !readStream) {
@@ -76,10 +81,21 @@ function readZipEntry(
       });
 
       readStream.on("end", () => {
-        resolve(Buffer.concat(chunks).toString("utf-8"));
+        const buffer = Buffer.concat(chunks);
+
+        if (!isTextBuffer(buffer)) {
+          resolve(null);
+          return;
+        }
+
+        resolve(buffer.toString("utf-8"));
       });
 
       readStream.on("error", reject);
     });
   });
+}
+
+function isTextBuffer(buffer: Buffer): boolean {
+  return !buffer.includes(0);
 }
