@@ -42,3 +42,10 @@ export function parseRepositoryUrl(repositoryUrl: string): RepositoryReference {
     name,
   };
 }
+
+export class RepositoryLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RepositoryLimitError";
+  }
+}

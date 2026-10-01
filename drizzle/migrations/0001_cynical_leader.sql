@@ -1,0 +1,1 @@
+ALTER TABLE "repository_chunks" ADD COLUMN "embedding" vector(768);

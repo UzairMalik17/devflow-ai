@@ -3,6 +3,7 @@ import { repositoryInputSchema } from "@/features/repositories/repository.schema
 import {
   InvalidRepositoryUrlError,
   parseRepositoryUrl,
+  RepositoryLimitError,
 } from "@/features/repositories/repository.utils";
 import {
   downloadGitHubRepositoryArchive,
@@ -11,8 +12,16 @@ import {
 } from "@/features/repositories/github.repository";
 import { readRepositoryArchive } from "@/features/repositories/repository.archive";
 import { chunkRepositoryFile } from "@/features/repositories/repository.chunk";
-import { findRepositoryByFullName } from "@/features/repositories/repository.service";
-import { saveRepositoryWithChunks } from "@/features/repositories/repository.service";
+import {
+  findRepositoryByFullName,
+  findRepositoryChunks,
+} from "@/features/repositories/repository.service";
+import {
+  saveRepository,
+  storeRepositoryChunkEmbeddings,
+} from "@/features/repositories/repository.service";
+import { generateDocumentEmbeddings } from "@/features/embedding/embedding.service";
+import { EMBEDDING_BATCH_SIZE } from "@/features/embedding/embedding.config";
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -40,44 +49,48 @@ export async function POST(request: Request) {
   try {
     const repositoryReference = parseRepositoryUrl(result.data.repositoryUrl);
 
-    const repository = await getGitHubRepository(
+    const githubRepository = await getGitHubRepository(
       repositoryReference.owner,
       repositoryReference.name,
     );
 
     const existingRepository = await findRepositoryByFullName(
-      repository.fullName,
+      githubRepository.fullName,
     );
+
+    let repository;
+    let chunks;
 
     if (existingRepository) {
-      return NextResponse.json({
-        message: "Repository already exists.",
-        repository: {
-          owner: existingRepository.owner,
-          name: existingRepository.name,
-        },
-      });
+      chunks = await findRepositoryChunks(existingRepository.id);
+      repository = existingRepository;
+    } else {
+      const archive = await downloadGitHubRepositoryArchive(
+        githubRepository.owner,
+        githubRepository.name,
+        githubRepository.defaultBranch,
+      );
+
+      const files = await readRepositoryArchive(archive);
+
+      chunks = files.flatMap((file) => chunkRepositoryFile(file));
+
+      repository = await saveRepository(githubRepository);
     }
 
-    const archive = await downloadGitHubRepositoryArchive(
-      repository.owner,
-      repository.name,
-      repository.defaultBranch,
-    );
+    for (let start = 0; start < chunks.length; start += EMBEDDING_BATCH_SIZE) {
+      const batch = chunks.slice(start, start + EMBEDDING_BATCH_SIZE);
 
-    const files = await readRepositoryArchive(archive);
-    const chunks = files.flatMap((file) => chunkRepositoryFile(file));
+      const embeddings = await generateDocumentEmbeddings(batch);
 
-    const createdRepository = await saveRepositoryWithChunks(
-      repository,
-      chunks,
-    );
+      await storeRepositoryChunkEmbeddings(repository.id, batch, embeddings);
+    }
 
     return NextResponse.json({
       message: "Repository ingested successfully.",
       repository: {
-        owner: createdRepository.owner,
-        name: createdRepository.name,
+        owner: existingRepository.owner,
+        name: existingRepository.name,
       },
     });
   } catch (error) {

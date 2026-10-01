@@ -1,6 +1,7 @@
 import type { RepositoryFile } from "./repository.archive";
 
 export type RepositoryChunk = {
+  id?: string;
   path: string;
   content: string;
 };

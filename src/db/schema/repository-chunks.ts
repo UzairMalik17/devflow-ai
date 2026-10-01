@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, vector } from "drizzle-orm/pg-core";
 import { repositories } from "./repositories";
 
 export const repositoryChunks = pgTable("repository_chunks", {
@@ -11,6 +11,10 @@ export const repositoryChunks = pgTable("repository_chunks", {
   path: text("path").notNull(),
 
   content: text("content").notNull(),
+
+  embedding: vector("embedding", {
+    dimensions: 768,
+  }),
 
   createdAt: timestamp("created_at", {
     withTimezone: true,
