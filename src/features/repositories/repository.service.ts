@@ -15,26 +15,63 @@ export async function findRepositoryByFullName(fullName: string) {
   return repository ?? null;
 }
 
-export async function saveRepositoryWithChunks(
-  repository: GitHubRepository,
+export async function findRepositoryChunks(repositoryId: string) {
+  const chunks = await db
+    .select()
+    .from(repositoryChunks)
+    .where(eq(repositoryChunks.repositoryId, repositoryId));
+
+  return chunks;
+}
+
+export async function saveRepository(repository: GitHubRepository) {
+  const [createdRepository] = await db
+    .insert(repositories)
+    .values(repository)
+    .returning();
+
+  return createdRepository;
+}
+
+export async function storeRepositoryChunkEmbeddings(
+  repositoryId: string,
   chunks: RepositoryChunk[],
+  embeddings: number[][],
 ) {
   return db.transaction(async (tx) => {
-    const [createdRepository] = await tx
-      .insert(repositories)
-      .values(repository)
-      .returning();
+    const newChunks = [];
+    const existingChunks = [];
 
-    if (chunks.length > 0) {
-      await tx.insert(repositoryChunks).values(
-        chunks.map((chunk) => ({
-          repositoryId: createdRepository.id,
+    for (let index = 0; index < chunks.length; index++) {
+      const chunk = chunks[index];
+      const embedding = embeddings[index];
+
+      if (chunk.id) {
+        existingChunks.push({
+          id: chunk.id,
+          embedding,
+        });
+      } else {
+        newChunks.push({
+          repositoryId,
           path: chunk.path,
           content: chunk.content,
-        })),
-      );
+          embedding,
+        });
+      }
     }
 
-    return createdRepository;
+    if (newChunks.length > 0) {
+      await tx.insert(repositoryChunks).values(newChunks);
+    }
+
+    for (const chunk of existingChunks) {
+      await tx
+        .update(repositoryChunks)
+        .set({
+          embedding: chunk.embedding,
+        })
+        .where(eq(repositoryChunks.id, chunk.id));
+    }
   });
 }
