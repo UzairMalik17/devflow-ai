@@ -15,6 +15,16 @@ export async function findRepositoryByFullName(fullName: string) {
   return repository ?? null;
 }
 
+export async function findRepositoryById(repositoryId: string) {
+  const [repository] = await db
+    .select()
+    .from(repositories)
+    .where(eq(repositories.id, repositoryId))
+    .limit(1);
+
+  return repository ?? null;
+}
+
 export async function findRepositoryChunks(repositoryId: string) {
   const chunks = await db
     .select()
