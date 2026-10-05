@@ -4,6 +4,7 @@ import { repositoryChatInputSchema } from "@/features/repositories/repository.sc
 import { findRepositoryById } from "@/features/repositories/repository.service";
 import { generateQueryEmbedding } from "@/features/embedding/embedding.service";
 import { findSimilarRepositoryChunks } from "@/features/repositories/repository.retrieval";
+import { generateRepositoryAnswer } from "@/features/llm/llm.service";
 
 type RouteContext = {
   params: Promise<{
@@ -47,9 +48,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     );
   }
 
-  const embedding = await generateQueryEmbedding(
-    "Where is authentication implemented?",
-  );
+  const embedding = await generateQueryEmbedding(result.data.query);
 
   console.log({
     dimensions: embedding.length,
@@ -57,6 +56,11 @@ export async function POST(request: NextRequest, context: RouteContext) {
   });
 
   const chunks = await findSimilarRepositoryChunks(repositoryId, embedding, 5);
+
+  const repositoryAnswer = await generateRepositoryAnswer(
+    result.data.query,
+    chunks,
+  );
 
   return Response.json({
     message: "Chat request received.",
@@ -71,5 +75,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       content: chunk.content,
       distance: chunk.distance,
     })),
+    answer: repositoryAnswer.answer,
+    sources: repositoryAnswer.sources,
   });
 }
