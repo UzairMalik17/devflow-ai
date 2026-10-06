@@ -12,6 +12,7 @@ import {
 import { readRepositoryArchive } from "@/features/repositories/repository.archive";
 import { chunkRepositoryFile } from "@/features/repositories/repository.chunk";
 import {
+  canIngestRepositoryToday,
   findRepositoryByFullName,
   findRepositoryChunks,
   saveRepository,
@@ -46,6 +47,17 @@ export async function POST(request: Request) {
         message: "Invalid repository input.",
       },
       { status: 400 },
+    );
+  }
+  const canIngest = await canIngestRepositoryToday();
+
+  if (!canIngest) {
+    return Response.json(
+      {
+        message:
+          "Daily repository ingestion limit reached. Please try again tomorrow.",
+      },
+      { status: 429 },
     );
   }
 
