@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and, gte, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { repositories } from "@/db/schema/repositories";
 import { repositoryChunks } from "@/db/schema/repository-chunks";
@@ -10,6 +10,16 @@ export async function findRepositoryByFullName(fullName: string) {
     .select()
     .from(repositories)
     .where(eq(repositories.fullName, fullName))
+    .limit(1);
+
+  return repository ?? null;
+}
+
+export async function findRepositoryById(repositoryId: string) {
+  const [repository] = await db
+    .select()
+    .from(repositories)
+    .where(eq(repositories.id, repositoryId))
     .limit(1);
 
   return repository ?? null;
@@ -74,4 +84,27 @@ export async function storeRepositoryChunkEmbeddings(
         .where(eq(repositoryChunks.id, chunk.id));
     }
   });
+}
+
+export async function canIngestRepositoryToday() {
+  const now = new Date();
+
+  const startOfToday = new Date(now);
+  startOfToday.setUTCHours(0, 0, 0, 0);
+
+  const startOfTomorrow = new Date(startOfToday);
+  startOfTomorrow.setUTCDate(startOfTomorrow.getUTCDate() + 1);
+
+  const repositoriesCreatedToday = await db
+    .select({ id: repositories.id })
+    .from(repositories)
+    .where(
+      and(
+        gte(repositories.createdAt, startOfToday),
+        lt(repositories.createdAt, startOfTomorrow),
+      ),
+    )
+    .limit(1);
+
+  return repositoriesCreatedToday.length === 0;
 }

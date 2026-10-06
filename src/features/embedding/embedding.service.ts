@@ -76,3 +76,60 @@ export async function generateDocumentEmbeddings(
 
   return embeddings as number[][];
 }
+
+export async function generateQueryEmbedding(query: string): Promise<number[]> {
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not configured.");
+  }
+
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${EMBEDDING_MODEL}:embedContent`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        content: {
+          parts: [
+            {
+              text: `task: code retrieval | query: ${query}`,
+            },
+          ],
+        },
+        outputDimensionality: EMBEDDING_DIMENSIONS,
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+
+    throw new Error(
+      `Gemini query embedding request failed with status ${response.status}: ${errorBody}`,
+    );
+  }
+
+  const data = (await response.json()) as {
+    embedding?: {
+      values?: number[];
+    };
+  };
+
+  const embedding = data.embedding?.values;
+
+  if (!embedding) {
+    throw new Error("Gemini returned no query embedding.");
+  }
+
+  if (embedding.length !== EMBEDDING_DIMENSIONS) {
+    throw new Error(
+      `Gemini returned an embedding with ${embedding.length} dimensions.`,
+    );
+  }
+
+  return embedding;
+}

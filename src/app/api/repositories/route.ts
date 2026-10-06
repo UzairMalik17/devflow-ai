@@ -3,7 +3,6 @@ import { repositoryInputSchema } from "@/features/repositories/repository.schema
 import {
   InvalidRepositoryUrlError,
   parseRepositoryUrl,
-  RepositoryLimitError,
 } from "@/features/repositories/repository.utils";
 import {
   downloadGitHubRepositoryArchive,
@@ -13,15 +12,20 @@ import {
 import { readRepositoryArchive } from "@/features/repositories/repository.archive";
 import { chunkRepositoryFile } from "@/features/repositories/repository.chunk";
 import {
+  canIngestRepositoryToday,
   findRepositoryByFullName,
   findRepositoryChunks,
-} from "@/features/repositories/repository.service";
-import {
   saveRepository,
   storeRepositoryChunkEmbeddings,
 } from "@/features/repositories/repository.service";
 import { generateDocumentEmbeddings } from "@/features/embedding/embedding.service";
 import { EMBEDDING_BATCH_SIZE } from "@/features/embedding/embedding.config";
+
+function wait(milliseconds: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
 
 export async function POST(request: Request) {
   let body: unknown;
@@ -43,6 +47,17 @@ export async function POST(request: Request) {
         message: "Invalid repository input.",
       },
       { status: 400 },
+    );
+  }
+  const canIngest = await canIngestRepositoryToday();
+
+  if (!canIngest) {
+    return Response.json(
+      {
+        message:
+          "Daily repository ingestion limit reached. Please try again tomorrow.",
+      },
+      { status: 429 },
     );
   }
 
@@ -84,13 +99,14 @@ export async function POST(request: Request) {
       const embeddings = await generateDocumentEmbeddings(batch);
 
       await storeRepositoryChunkEmbeddings(repository.id, batch, embeddings);
+      await wait(60_000);
     }
 
     return NextResponse.json({
       message: "Repository ingested successfully.",
       repository: {
-        owner: existingRepository.owner,
-        name: existingRepository.name,
+        owner: repository.owner,
+        name: repository.name,
       },
     });
   } catch (error) {
