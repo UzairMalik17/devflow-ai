@@ -2,8 +2,129 @@ import { eq, and, gte, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { repositories } from "@/db/schema/repositories";
 import { repositoryChunks } from "@/db/schema/repository-chunks";
-import type { GitHubRepository } from "./github.repository";
-import type { RepositoryChunk } from "./repository.chunk";
+import {
+  getGitHubRepository,
+  downloadGitHubRepositoryArchive,
+  GitHubRepositoryError,
+  type GitHubRepository,
+} from "./github.repository";
+import {
+  readRepositoryArchive,
+  type RepositoryFile,
+} from "./repository.archive";
+import { EMBEDDING_BATCH_SIZE } from "../embedding/embedding.config";
+import { generateDocumentEmbeddings } from "../embedding/embedding.service";
+import { CHUNK_OVERLAP, CHUNK_SIZE } from "./repository.config";
+import { storeRepositoryChunkEmbeddings } from "./repository.repository";
+
+export type RepositoryChunk = {
+  id?: string;
+  path: string;
+  content: string;
+};
+
+export class RepositoryLimitError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RepositoryLimitError";
+  }
+}
+
+export class InvalidRepositoryUrlError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidRepositoryUrlError";
+  }
+}
+export class RepositoryNotFoundError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RepositoryNotFoundError";
+  }
+}
+
+export async function analyzeRepository(repositoryUrl: string) {
+  try {
+    const repositoryReference = parseRepositoryUrl(repositoryUrl);
+
+    const githubRepository = await getGitHubRepository(
+      repositoryReference.owner,
+      repositoryReference.name,
+    );
+
+    const existingRepository = await findRepositoryByFullName(
+      githubRepository.fullName,
+    );
+
+    let repository;
+    let chunks;
+
+    if (existingRepository) {
+      chunks = await findRepositoryChunks(existingRepository.id);
+      repository = existingRepository;
+    } else {
+      const canIngest = await canIngestRepositoryToday();
+
+      if (!canIngest) {
+        throw new RepositoryLimitError(
+          "Daily repository ingestion limit reached. Please try again tomorrow.",
+        );
+      }
+      const archive = await downloadGitHubRepositoryArchive(
+        githubRepository.owner,
+        githubRepository.name,
+        githubRepository.defaultBranch,
+      );
+
+      const files = await readRepositoryArchive(archive);
+
+      chunks = files.flatMap((file) => chunkRepositoryFile(file));
+
+      repository = await saveRepository(githubRepository);
+      for (
+        let start = 0;
+        start < chunks.length;
+        start += EMBEDDING_BATCH_SIZE
+      ) {
+        const batch = chunks.slice(start, start + EMBEDDING_BATCH_SIZE);
+
+        const embeddings = await generateDocumentEmbeddings(batch);
+
+        await storeRepositoryChunkEmbeddings(repository.id, batch, embeddings);
+        await wait(60_000);
+      }
+    }
+
+    return {
+      message: "Repository ingested successfully.",
+      repository: {
+        owner: repository.owner,
+        name: repository.name,
+      },
+    };
+  } catch (error) {
+    if (error instanceof GitHubRepositoryError) {
+      if (error.status === 404) {
+        throw new RepositoryNotFoundError(
+          "Repository not found or inaccessible.",
+        );
+      }
+
+      throw new Error("Unable to access the repository.");
+    }
+
+    if (
+      error instanceof InvalidRepositoryUrlError ||
+      error instanceof RepositoryLimitError
+    ) {
+      throw error;
+    }
+
+    console.error("Failed to process repository:", error);
+
+    throw new Error("Unable to process repository.");
+  }
+}
 
 export async function findRepositoryByFullName(fullName: string) {
   const [repository] = await db
@@ -43,50 +164,7 @@ export async function saveRepository(repository: GitHubRepository) {
   return createdRepository;
 }
 
-export async function storeRepositoryChunkEmbeddings(
-  repositoryId: string,
-  chunks: RepositoryChunk[],
-  embeddings: number[][],
-) {
-  return db.transaction(async (tx) => {
-    const newChunks = [];
-    const existingChunks = [];
-
-    for (let index = 0; index < chunks.length; index++) {
-      const chunk = chunks[index];
-      const embedding = embeddings[index];
-
-      if (chunk.id) {
-        existingChunks.push({
-          id: chunk.id,
-          embedding,
-        });
-      } else {
-        newChunks.push({
-          repositoryId,
-          path: chunk.path,
-          content: chunk.content,
-          embedding,
-        });
-      }
-    }
-
-    if (newChunks.length > 0) {
-      await tx.insert(repositoryChunks).values(newChunks);
-    }
-
-    for (const chunk of existingChunks) {
-      await tx
-        .update(repositoryChunks)
-        .set({
-          embedding: chunk.embedding,
-        })
-        .where(eq(repositoryChunks.id, chunk.id));
-    }
-  });
-}
-
-export async function canIngestRepositoryToday() {
+async function canIngestRepositoryToday() {
   const now = new Date();
 
   const startOfToday = new Date(now);
@@ -107,4 +185,66 @@ export async function canIngestRepositoryToday() {
     .limit(1);
 
   return repositoriesCreatedToday.length === 0;
+}
+
+function wait(milliseconds: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
+function chunkRepositoryFile(file: RepositoryFile): RepositoryChunk[] {
+  const chunks: RepositoryChunk[] = [];
+
+  let start = 0;
+
+  while (start < file.content.length) {
+    const end = Math.min(start + CHUNK_SIZE, file.content.length);
+
+    chunks.push({
+      path: file.path,
+      content: file.content.slice(start, end),
+    });
+
+    if (end === file.content.length) {
+      break;
+    }
+
+    start = end - CHUNK_OVERLAP;
+  }
+
+  return chunks;
+}
+
+function parseRepositoryUrl(repositoryUrl: string) {
+  const url = new URL(repositoryUrl);
+
+  if (url.hostname !== "github.com") {
+    throw new InvalidRepositoryUrlError("Repository must be hosted on GitHub.");
+  }
+
+  const pathname = url.pathname.replace(/\/$/, "");
+
+  if (pathname.includes("//")) {
+    throw new InvalidRepositoryUrlError("Invalid GitHub repository URL.");
+  }
+
+  const segments = pathname.split("/").filter(Boolean);
+
+  if (segments.length < 2) {
+    throw new InvalidRepositoryUrlError("Invalid GitHub repository URL.");
+  }
+
+  const [owner, rawName] = segments;
+
+  const name = rawName.endsWith(".git") ? rawName.slice(0, -4) : rawName;
+
+  if (!owner || !name) {
+    throw new InvalidRepositoryUrlError("Invalid GitHub repository URL.");
+  }
+
+  return {
+    owner,
+    name,
+  };
 }
