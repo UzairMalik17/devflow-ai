@@ -1,5 +1,9 @@
 import yauzl from "yauzl";
-import { isRepositoryFileAllowed } from "@/features/repositories/repository.filter";
+import {
+  BINARY_EXTENSIONS,
+  SENSITIVE_FILE_NAMES,
+  EXCLUDED_DIRECTORIES,
+} from "./repository.config";
 
 export type RepositoryFile = {
   path: string;
@@ -98,4 +102,35 @@ function readZipEntry(
 
 function isTextBuffer(buffer: Buffer): boolean {
   return !buffer.includes(0);
+}
+
+function isRepositoryFileAllowed(path: string): boolean {
+  const pathSegments = path.split("/");
+  const fileName = pathSegments.at(-1)?.toLowerCase();
+
+  if (!fileName) {
+    return false;
+  }
+
+  const hasExcludedDirectory = pathSegments
+    .slice(0, -1)
+    .some((segment) => EXCLUDED_DIRECTORIES.includes(segment.toLowerCase()));
+
+  if (hasExcludedDirectory) {
+    return false;
+  }
+
+  if (SENSITIVE_FILE_NAMES.includes(fileName)) {
+    return false;
+  }
+
+  const hasBinaryExtension = BINARY_EXTENSIONS.some((extension) =>
+    fileName.endsWith(extension),
+  );
+
+  if (hasBinaryExtension) {
+    return false;
+  }
+
+  return true;
 }

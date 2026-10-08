@@ -1,10 +1,15 @@
 import { NextRequest } from "next/server";
+import { z } from "zod";
+import {
+  chatWithRepository,
+  RepositoryNotFoundError,
+} from "@/features/repositories/repository.service";
 
-import { repositoryChatInputSchema } from "@/features/repositories/repository.schema";
-import { findRepositoryById } from "@/features/repositories/repository.service";
-import { generateQueryEmbedding } from "@/features/embedding/embedding.service";
-import { findSimilarRepositoryChunks } from "@/features/repositories/repository.retrieval";
-import { generateRepositoryAnswer } from "@/features/llm/llm.service";
+const repositoryChatInputSchema = z.object({
+  query: z.string().trim().min(1, {
+    error: "Query is required.",
+  }),
+});
 
 type RouteContext = {
   params: Promise<{
@@ -37,45 +42,20 @@ export async function POST(request: NextRequest, context: RouteContext) {
     );
   }
 
-  const repository = await findRepositoryById(repositoryId);
+  try {
+    const response = await chatWithRepository(repositoryId, result.data.query);
 
-  if (!repository) {
+    return Response.json(response);
+  } catch (error) {
+    if (error instanceof RepositoryNotFoundError) {
+      return Response.json({ message: error.message }, { status: 404 });
+    }
+
+    console.error("Failed to chat with repository:", error);
+
     return Response.json(
-      {
-        message: "Repository not found.",
-      },
-      { status: 404 },
+      { message: "Unable to answer your question." },
+      { status: 500 },
     );
   }
-
-  const embedding = await generateQueryEmbedding(result.data.query);
-
-  console.log({
-    dimensions: embedding.length,
-    firstValues: embedding.slice(0, 5),
-  });
-
-  const chunks = await findSimilarRepositoryChunks(repositoryId, embedding, 5);
-
-  const repositoryAnswer = await generateRepositoryAnswer(
-    result.data.query,
-    chunks,
-  );
-
-  return Response.json({
-    message: "Chat request received.",
-    repository: {
-      id: repository.id,
-      fullName: repository.fullName,
-    },
-    query: result.data.query,
-    chunks: chunks.map((chunk) => ({
-      id: chunk.id,
-      path: chunk.path,
-      content: chunk.content,
-      distance: chunk.distance,
-    })),
-    answer: repositoryAnswer.answer,
-    sources: repositoryAnswer.sources,
-  });
 }
