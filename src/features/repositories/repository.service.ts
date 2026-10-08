@@ -13,9 +13,16 @@ import {
   type RepositoryFile,
 } from "./repository.archive";
 import { EMBEDDING_BATCH_SIZE } from "../embedding/embedding.config";
-import { generateDocumentEmbeddings } from "../embedding/embedding.service";
+import {
+  generateDocumentEmbeddings,
+  generateQueryEmbedding,
+} from "../embedding/embedding.service";
 import { CHUNK_OVERLAP, CHUNK_SIZE } from "./repository.config";
-import { storeRepositoryChunkEmbeddings } from "./repository.repository";
+import {
+  findSimilarRepositoryChunks,
+  storeRepositoryChunkEmbeddings,
+} from "./repository.repository";
+import { generateRepositoryAnswer } from "../llm/llm.service";
 
 export type RepositoryChunk = {
   id?: string;
@@ -246,5 +253,29 @@ function parseRepositoryUrl(repositoryUrl: string) {
   return {
     owner,
     name,
+  };
+}
+
+export async function chatWithRepository(repositoryId: string, query: string) {
+  const repository = await findRepositoryById(repositoryId);
+
+  if (!repository) {
+    throw new RepositoryNotFoundError("Repository not found.");
+  }
+
+  const embedding = await generateQueryEmbedding(query);
+
+  const chunks = await findSimilarRepositoryChunks(repositoryId, embedding, 5);
+
+  const repositoryAnswer = await generateRepositoryAnswer(query, chunks);
+
+  return {
+    repository: {
+      id: repository.id,
+      fullName: repository.fullName,
+    },
+    query,
+    answer: repositoryAnswer.answer,
+    sources: repositoryAnswer.sources,
   };
 }
