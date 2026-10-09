@@ -1,4 +1,4 @@
-import { eq, and, gte, lt } from "drizzle-orm";
+import { eq, and, gte, lt, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { repositories } from "@/db/schema/repositories";
 import { repositoryChunks } from "@/db/schema/repository-chunks";
@@ -278,4 +278,12 @@ export async function chatWithRepository(repositoryId: string, query: string) {
     answer: repositoryAnswer.answer,
     sources: repositoryAnswer.sources,
   };
+}
+
+export async function allRepositories() {
+  return await db
+    .select()
+    .from(repositories)
+    .orderBy(desc(repositories.createdAt))
+    .limit(10);
 }

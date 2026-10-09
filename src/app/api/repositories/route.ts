@@ -2,6 +2,7 @@ import {
   InvalidRepositoryUrlError,
   RepositoryLimitError,
   RepositoryNotFoundError,
+  allRepositories,
 } from "@/features/repositories/repository.service";
 import { analyzeRepository } from "@/features/repositories/repository.service";
 import { z } from "zod";
@@ -72,6 +73,23 @@ export async function POST(request: Request) {
     return Response.json(
       {
         message: "Unable to analyze repository.",
+      },
+      { status: 500 },
+    );
+  }
+}
+
+export async function GET() {
+  try {
+    const repositories = await allRepositories();
+
+    return Response.json({ repositories }, { status: 200 });
+  } catch (error) {
+    console.error("Failed to fetch repositories:", error);
+
+    return Response.json(
+      {
+        message: "Failed to fetch repositories",
       },
       { status: 500 },
     );
