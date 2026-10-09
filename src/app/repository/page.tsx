@@ -1,4 +1,4 @@
-import { RepositoryForm } from "@/components/repository/repository-from";
+import { RepositoryForm } from "@/components/repository/repository-form";
 
 export default function RepositoryPage() {
   return <RepositoryForm />;

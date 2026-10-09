@@ -107,6 +107,7 @@ export async function analyzeRepository(repositoryUrl: string) {
       repository: {
         owner: repository.owner,
         name: repository.name,
+        id: repository.id,
       },
     };
   } catch (error) {
@@ -284,6 +285,5 @@ export async function allRepositories() {
   return await db
     .select()
     .from(repositories)
-    .orderBy(desc(repositories.createdAt))
-    .limit(10);
+    .orderBy(desc(repositories.createdAt));
 }
