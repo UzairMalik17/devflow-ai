@@ -1,4 +1,4 @@
-import { RepositoryForm } from "./repository-form";
+import { RepositoryForm } from "./RepositoryForm";
 
 export function RepositoryEmptyState() {
   return (

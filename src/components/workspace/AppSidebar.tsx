@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 type Repository = {
   id: string;
@@ -15,6 +16,7 @@ type Repository = {
 };
 
 export function AppSidebar() {
+  const router = useRouter();
   const [repositories, setRepositories] = useState<Repository[]>([]);
   const [selectedRepositoryId, setSelectedRepositoryId] = useState<
     string | null
@@ -88,7 +90,10 @@ export function AppSidebar() {
                 <button
                   key={repository.id}
                   type="button"
-                  onClick={() => setSelectedRepositoryId(repository.id)}
+                  onClick={() => {
+                    setSelectedRepositoryId(repository.id);
+                    router.push(`/${repository.id}/chat`);
+                  }}
                   aria-pressed={isSelected}
                   className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors hover:cursor-pointer ${
                     isSelected
