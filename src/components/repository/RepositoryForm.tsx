@@ -73,8 +73,14 @@ export const RepositoryForm = () => {
 
       <button
         type="submit"
-        disabled={submissionState.status === "submitting"}
-        className="w-full rounded-lg bg-black px-4 py-3 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+        disabled={
+          !repositoryUrl.trim() || submissionState.status === "submitting"
+        }
+        className={`w-full rounded-lg px-4 py-3 font-medium transition-all duration-200 disabled:cursor-not-allowed ${
+          repositoryUrl.trim() && submissionState.status !== "submitting"
+            ? "bg-[#f2f0eb] text-[#171717] hover:bg-white active:scale-[0.99] hover:cursor-pointer"
+            : "cursor-not-allowed bg-black text-[#737373]"
+        }`}
       >
         {submissionState.status === "submitting"
           ? "Analyzing..."
