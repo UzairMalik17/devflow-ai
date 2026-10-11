@@ -47,7 +47,7 @@ export function AppSidebar() {
   }, []);
 
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-r border-white/10 bg-[#171717] p-4 md:flex">
+    <aside className="hidden h-[100vh] w-64 shrink-0 flex-col border-r border-white/10 bg-[#171717] p-4 overflow-y-auto sticky top-0 md:flex">
       <Link href="/" className="mb-8 flex items-center gap-3">
         <span className="flex size-9 items-center justify-center rounded-lg bg-[#f2f0eb] font-semibold text-[#171717]">
           D
