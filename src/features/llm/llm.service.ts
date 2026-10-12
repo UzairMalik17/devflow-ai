@@ -1,6 +1,6 @@
 import { gemini } from "@/lib/gemini";
 import { LLM_MODEL } from "./llm.config";
-import { RepositoryChunk } from "../repositories/repository.chunk";
+import { RepositoryChunk } from "../repositories/repository.service";
 
 export type RepositoryAnswer = {
   answer: string;

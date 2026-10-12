@@ -1,4 +1,4 @@
-import { RepositoryChunk } from "../repositories/repository.chunk";
+import { RepositoryChunk } from "../repositories/repository.service";
 import {
   EMBEDDING_BATCH_SIZE,
   EMBEDDING_DIMENSIONS,
