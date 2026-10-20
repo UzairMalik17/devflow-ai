@@ -9,8 +9,8 @@
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "worker:test": "tsx src/workers/test-worker.ts",
-    "queue:test": "tsx src/lib/queue/test-producer.ts"
+    "worker:chunking": "tsx src/workers/chunking-worker.ts",
+    "worker:embedding": "tsx src/workers/embedding-worker.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",

@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and, isNull, asc } from "drizzle-orm";
 
 import { db } from "@/db";
 import { repositoryChunks } from "@/db/schema/repository-chunks";
@@ -37,45 +37,71 @@ export async function findSimilarRepositoryChunks(
   return chunks;
 }
 
-export async function storeRepositoryChunkEmbeddings(
+export async function storeRepositoryChunks(
   repositoryId: string,
+  chunks: RepositoryChunk[],
+) {
+  if (chunks.length === 0) {
+    return;
+  }
+
+  const newChunks = chunks.map((chunk) => ({
+    repositoryId,
+    path: chunk.path,
+    content: chunk.content,
+  }));
+
+  await db.insert(repositoryChunks).values(newChunks);
+}
+
+export async function findRepositoryChunksWithoutEmbeddings(
+  repositoryId: string,
+  limit: number,
+) {
+  const chunks = await db
+    .select()
+    .from(repositoryChunks)
+    .where(
+      and(
+        eq(repositoryChunks.repositoryId, repositoryId),
+        isNull(repositoryChunks.embedding),
+      ),
+    )
+    .orderBy(asc(repositoryChunks.id))
+    .limit(limit);
+
+  return chunks;
+}
+
+export async function storeRepositoryChunkEmbeddings(
   chunks: RepositoryChunk[],
   embeddings: number[][],
 ) {
-  return db.transaction(async (tx) => {
-    const newChunks = [];
-    const existingChunks = [];
+  if (chunks.length !== embeddings.length) {
+    throw new Error("Chunks and embeddings count do not match");
+  }
 
-    for (let index = 0; index < chunks.length; index++) {
-      const chunk = chunks[index];
-      const embedding = embeddings[index];
+  if (chunks.length === 0) {
+    return;
+  }
 
-      if (chunk.id) {
-        existingChunks.push({
-          id: chunk.id,
-          embedding,
-        });
-      } else {
-        newChunks.push({
-          repositoryId,
-          path: chunk.path,
-          content: chunk.content,
-          embedding,
-        });
-      }
+  const values = chunks.map((chunk, index) => {
+    if (!chunk.id) {
+      throw new Error("Cannot store embedding for a chunk without an ID");
     }
 
-    if (newChunks.length > 0) {
-      await tx.insert(repositoryChunks).values(newChunks);
-    }
-
-    for (const chunk of existingChunks) {
-      await tx
-        .update(repositoryChunks)
-        .set({
-          embedding: chunk.embedding,
-        })
-        .where(eq(repositoryChunks.id, chunk.id));
-    }
+    return sql`(
+      ${chunk.id},
+      ${JSON.stringify(embeddings[index])}::vector
+    )`;
   });
+
+  await db.execute(sql`
+    UPDATE ${repositoryChunks} AS target
+    SET embedding = source.embedding
+    FROM (
+      VALUES ${sql.join(values, sql`, `)}
+    ) AS source(id, embedding)
+    WHERE target.id = source.id
+  `);
 }

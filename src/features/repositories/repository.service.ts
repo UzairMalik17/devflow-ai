@@ -4,25 +4,15 @@ import { repositories } from "@/db/schema/repositories";
 import { repositoryChunks } from "@/db/schema/repository-chunks";
 import {
   getGitHubRepository,
-  downloadGitHubRepositoryArchive,
   GitHubRepositoryError,
   type GitHubRepository,
 } from "./github.repository";
-import {
-  readRepositoryArchive,
-  type RepositoryFile,
-} from "./repository.archive";
-import { EMBEDDING_BATCH_SIZE } from "../embedding/embedding.config";
-import {
-  generateDocumentEmbeddings,
-  generateQueryEmbedding,
-} from "../embedding/embedding.service";
+import { type RepositoryFile } from "./repository.archive";
+import { generateQueryEmbedding } from "../embedding/embedding.service";
 import { CHUNK_OVERLAP, CHUNK_SIZE } from "./repository.config";
-import {
-  findSimilarRepositoryChunks,
-  storeRepositoryChunkEmbeddings,
-} from "./repository.repository";
+import { findSimilarRepositoryChunks } from "./repository.repository";
 import { generateRepositoryAnswer } from "../llm/llm.service";
+import { chunkingQueue } from "@/lib/queue/chunking-queue";
 
 export type RepositoryChunk = {
   id?: string;
@@ -64,10 +54,8 @@ export async function analyzeRepository(repositoryUrl: string) {
     );
 
     let repository;
-    let chunks;
 
     if (existingRepository) {
-      chunks = await findRepositoryChunks(existingRepository.id);
       repository = existingRepository;
     } else {
       const canIngest = await canIngestRepositoryToday();
@@ -77,29 +65,10 @@ export async function analyzeRepository(repositoryUrl: string) {
           "Daily repository ingestion limit reached. Please try again tomorrow.",
         );
       }
-      const archive = await downloadGitHubRepositoryArchive(
-        githubRepository.owner,
-        githubRepository.name,
-        githubRepository.defaultBranch,
-      );
-
-      const files = await readRepositoryArchive(archive);
-
-      chunks = files.flatMap((file) => chunkRepositoryFile(file));
 
       repository = await saveRepository(githubRepository);
-      for (
-        let start = 0;
-        start < chunks.length;
-        start += EMBEDDING_BATCH_SIZE
-      ) {
-        const batch = chunks.slice(start, start + EMBEDDING_BATCH_SIZE);
 
-        const embeddings = await generateDocumentEmbeddings(batch);
-
-        await storeRepositoryChunkEmbeddings(repository.id, batch, embeddings);
-        await wait(60_000);
-      }
+      await chunkingQueue.add("chunk-repository", repository);
     }
 
     return {
@@ -195,13 +164,7 @@ async function canIngestRepositoryToday() {
   return repositoriesCreatedToday.length === 0;
 }
 
-function wait(milliseconds: number) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, milliseconds);
-  });
-}
-
-function chunkRepositoryFile(file: RepositoryFile): RepositoryChunk[] {
+export function chunkRepositoryFile(file: RepositoryFile): RepositoryChunk[] {
   const chunks: RepositoryChunk[] = [];
 
   let start = 0;
