@@ -91,12 +91,13 @@ export async function storeRepositoryChunkEmbeddings(
     }
 
     return sql`(
-      ${chunk.id},
+      ${chunk.id}::uuid,
       ${JSON.stringify(embeddings[index])}::vector
     )`;
   });
 
-  await db.execute(sql`
+  try {
+    await db.execute(sql`
     UPDATE ${repositoryChunks} AS target
     SET embedding = source.embedding
     FROM (
@@ -104,4 +105,8 @@ export async function storeRepositoryChunkEmbeddings(
     ) AS source(id, embedding)
     WHERE target.id = source.id
   `);
+  } catch (error) {
+    console.dir(error, { depth: 10 });
+    throw error;
+  }
 }
