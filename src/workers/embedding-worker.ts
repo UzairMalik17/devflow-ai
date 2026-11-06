@@ -3,9 +3,11 @@ import { redisConnection } from "../lib/queue/redis";
 import {
   findRepositoryChunksWithoutEmbeddings,
   storeRepositoryChunkEmbeddings,
+  updateRepository,
 } from "@/features/repositories/repository.repository";
 import { EMBEDDING_BATCH_SIZE } from "@/features/embedding/embedding.config";
 import { generateDocumentEmbeddings } from "@/features/embedding/embedding.service";
+import { IngestionStatus } from "@/constants/enums";
 
 const worker = new Worker(
   "repository-embedding",
@@ -30,6 +32,10 @@ const worker = new Worker(
 
       await new Promise((resolve) => setTimeout(resolve, 60_000));
     }
+
+    await updateRepository(job.data.repositoryId, {
+      ingestionStatus: IngestionStatus.COMPLETED,
+    });
 
     return {
       message: "Embedding test completed",

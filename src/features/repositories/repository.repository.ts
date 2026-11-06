@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { repositoryChunks } from "@/db/schema/repository-chunks";
 import { EMBEDDING_DIMENSIONS } from "../embedding/embedding.config";
 import type { RepositoryChunk } from "./repository.service";
+import { repositories } from "@/db/schema/repositories";
 
 export async function findSimilarRepositoryChunks(
   repositoryId: string,
@@ -109,4 +110,15 @@ export async function storeRepositoryChunkEmbeddings(
     console.dir(error, { depth: 10 });
     throw error;
   }
+}
+
+export async function updateRepository(
+  repositoryId: string,
+  data: Partial<typeof repositories.$inferInsert>,
+) {
+  return db
+    .update(repositories)
+    .set(data)
+    .where(eq(repositories.id, repositoryId))
+    .returning();
 }

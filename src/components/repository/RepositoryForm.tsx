@@ -1,5 +1,6 @@
 "use client";
 
+import { useRepositoryRefresh } from "@/context/repository-refresh-context";
 import { useState } from "react";
 
 type SubmissionState =
@@ -13,10 +14,10 @@ export const RepositoryForm = () => {
   const [submissionState, setSubmissionState] = useState<SubmissionState>({
     status: "idle",
   });
+  const { notifyRepositoryAdded } = useRepositoryRefresh();
 
   async function handleSubmit(event: React.SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
-
     setSubmissionState({ status: "submitting" });
 
     try {
@@ -35,6 +36,7 @@ export const RepositoryForm = () => {
       if (!response.ok) {
         throw new Error(data.message ?? "Something went wrong");
       }
+      notifyRepositoryAdded();
 
       setSubmissionState({
         status: "success",

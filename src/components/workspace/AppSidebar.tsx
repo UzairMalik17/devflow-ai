@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useRepositoryRefresh } from "@/context/repository-refresh-context";
+import { IngestionStatus } from "@/constants/enums";
 
 type Repository = {
   id: string;
@@ -11,22 +13,48 @@ type Repository = {
   fullName: string;
   defaultBranch: string;
   htmlUrl: string;
+  ingestionStatus: IngestionStatus;
   createdAt: string;
   updatedAt: string;
 };
 
+const ingestionStatusStyles: Record<
+  IngestionStatus,
+  { label: string; className: string }
+> = {
+  [IngestionStatus.PENDING]: {
+    label: "Pending",
+    className: "bg-yellow-500/10 text-yellow-400",
+  },
+  [IngestionStatus.PROCESSING]: {
+    label: "Processing",
+    className: "bg-blue-500/10 text-blue-400",
+  },
+  [IngestionStatus.COMPLETED]: {
+    label: "Completed",
+    className: "bg-green-500/10 text-green-400",
+  },
+  [IngestionStatus.FAILED]: {
+    label: "Failed",
+    className: "bg-red-500/10 text-red-400",
+  },
+};
+
 export function AppSidebar() {
   const router = useRouter();
+  const pathname = usePathname();
+
   const [repositories, setRepositories] = useState<Repository[]>([]);
-  const [selectedRepositoryId, setSelectedRepositoryId] = useState<
-    string | null
-  >(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const { repositoryRefreshKey } = useRepositoryRefresh();
 
   useEffect(() => {
     async function fetchRepositories() {
       try {
+        setError(null);
+
         const response = await fetch("/api/repositories");
 
         if (!response.ok) {
@@ -44,10 +72,10 @@ export function AppSidebar() {
     }
 
     fetchRepositories();
-  }, []);
+  }, [repositoryRefreshKey]);
 
   return (
-    <aside className="hidden h-[100vh] w-64 shrink-0 flex-col border-r border-white/10 bg-[#171717] p-4 overflow-y-auto sticky top-0 md:flex">
+    <aside className="sticky top-0 hidden h-[100vh] w-64 shrink-0 flex-col overflow-y-auto border-r border-white/10 bg-[#171717] p-4 md:flex">
       <Link href="/" className="mb-8 flex items-center gap-3">
         <span className="flex size-9 items-center justify-center rounded-lg bg-[#f2f0eb] font-semibold text-[#171717]">
           D
@@ -84,16 +112,15 @@ export function AppSidebar() {
             </p>
           ) : (
             repositories.map((repository) => {
-              const isSelected = selectedRepositoryId === repository.id;
+              const isSelected = pathname.startsWith(`/${repository.id}/`);
+
+              const status = ingestionStatusStyles[repository.ingestionStatus];
 
               return (
                 <button
                   key={repository.id}
                   type="button"
-                  onClick={() => {
-                    setSelectedRepositoryId(repository.id);
-                    router.push(`/${repository.id}/chat`);
-                  }}
+                  onClick={() => router.push(`/${repository.id}/chat`)}
                   aria-pressed={isSelected}
                   className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors hover:cursor-pointer ${
                     isSelected
@@ -107,6 +134,12 @@ export function AppSidebar() {
 
                   <span className="mt-1 block truncate text-xs opacity-70">
                     {repository.owner}
+                  </span>
+
+                  <span
+                    className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${status.className}`}
+                  >
+                    {status.label}
                   </span>
                 </button>
               );

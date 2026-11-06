@@ -5,11 +5,16 @@ import { downloadGitHubRepositoryArchive } from "@/features/repositories/github.
 import { readRepositoryArchive } from "@/features/repositories/repository.archive";
 import { chunkRepositoryFile } from "@/features/repositories/repository.service";
 import { embeddingQueue } from "@/lib/queue/embedding-queue";
+import { IngestionStatus } from "@/constants/enums";
+import { updateRepository } from "@/features/repositories/repository.repository";
 
 const worker = new Worker(
   "repository-chunking",
   async (job) => {
     console.log(`Chunking job ${job.id} started`);
+    await updateRepository(job.data.id, {
+      ingestionStatus: IngestionStatus.PROCESSING,
+    });
 
     const archive = await downloadGitHubRepositoryArchive(
       job.data.owner,
