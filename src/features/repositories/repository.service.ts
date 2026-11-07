@@ -13,6 +13,7 @@ import { CHUNK_OVERLAP, CHUNK_SIZE } from "./repository.config";
 import { findSimilarRepositoryChunks } from "./repository.repository";
 import { generateRepositoryAnswer } from "../llm/llm.service";
 import { chunkingQueue } from "@/lib/queue/chunking-queue";
+import type { Repository } from "@/db/schema/repositories";
 
 export type RepositoryChunk = {
   id?: string;
@@ -220,16 +221,13 @@ function parseRepositoryUrl(repositoryUrl: string) {
   };
 }
 
-export async function chatWithRepository(repositoryId: string, query: string) {
-  const repository = await findRepositoryById(repositoryId);
-
-  if (!repository) {
-    throw new RepositoryNotFoundError("Repository not found.");
-  }
-
+export async function chatWithRepository(
+  repository: Repository,
+  query: string,
+) {
   const embedding = await generateQueryEmbedding(query);
 
-  const chunks = await findSimilarRepositoryChunks(repositoryId, embedding, 5);
+  const chunks = await findSimilarRepositoryChunks(repository.id, embedding, 5);
 
   const repositoryAnswer = await generateRepositoryAnswer(query, chunks);
 

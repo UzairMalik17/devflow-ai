@@ -31,3 +31,5 @@ export const repositories = pgTable("repositories", {
     .defaultNow()
     .notNull(),
 });
+
+export type Repository = typeof repositories.$inferSelect;

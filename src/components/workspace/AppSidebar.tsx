@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useRepositoryRefresh } from "@/context/repository-refresh-context";
 import { IngestionStatus } from "@/constants/enums";
 
-type Repository = {
+export type Repository = {
   id: string;
   owner: string;
   name: string;
@@ -18,7 +18,7 @@ type Repository = {
   updatedAt: string;
 };
 
-const ingestionStatusStyles: Record<
+export const ingestionStatusStyles: Record<
   IngestionStatus,
   { label: string; className: string }
 > = {
