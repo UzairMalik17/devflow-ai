@@ -7,11 +7,19 @@ type RouteContext = {
   }>;
 };
 
-export async function GET({ params }: RouteContext) {
+export async function GET(_request: Request, { params }: RouteContext) {
   const { repositoryId } = await params;
 
   try {
     const repository = await findRepositoryById(repositoryId);
+
+    if (!repository) {
+      return NextResponse.json(
+        { message: "Repository not found." },
+        { status: 404 },
+      );
+    }
+
     return NextResponse.json({
       repository,
     });
