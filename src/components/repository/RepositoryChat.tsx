@@ -4,6 +4,8 @@ import { IngestionStatus } from "@/constants/enums";
 import { useState, useRef, useEffect, type SubmitEvent } from "react";
 import { Repository } from "../workspace/AppSidebar";
 import { ingestionStatusStyles } from "../workspace/AppSidebar";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -72,7 +74,7 @@ export function RepositoryChat({ repositoryId }: RepositoryChatProps) {
       content: question,
     };
 
-    setMessages((currentMessages) => [...currentMessages, userMessage]);
+    setMessages((prevMessages) => [...prevMessages, userMessage]);
     setInput("");
     setError(null);
     setIsLoading(true);
@@ -88,7 +90,7 @@ export function RepositoryChat({ repositoryId }: RepositoryChatProps) {
         }),
       });
 
-      const data: { message?: string; answer?: string; sources?: string } =
+      const data: { message?: string; answer: string; sources?: string } =
         await response.json();
 
       if (!response.ok) {
@@ -99,11 +101,11 @@ export function RepositoryChat({ repositoryId }: RepositoryChatProps) {
         throw new Error("The server returned an empty response.");
       }
 
-      setMessages((currentMessages) => [
-        ...currentMessages,
+      setMessages((prevMessages) => [
+        ...prevMessages,
         {
           role: "assistant",
-          content: data.answer + (data.sources ?? ""),
+          content: data.answer,
         },
       ]);
     } catch (err) {
@@ -187,9 +189,17 @@ export function RepositoryChat({ repositoryId }: RepositoryChatProps) {
                     {message.role === "user" ? "You" : "DevFlow AI"}
                   </p>
 
-                  <p className="whitespace-pre-wrap break-words text-sm leading-6">
-                    {message.content}
-                  </p>
+                  {message.role === "assistant" ? (
+                    <div className="prose prose-invert prose-sm max-w-none text-sm leading-6 text-[#f2f0eb]">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    <p className="whitespace-pre-wrap break-words text-sm leading-6">
+                      {message.content}
+                    </p>
+                  )}
                 </div>
               </div>
             ))}
