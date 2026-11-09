@@ -2,8 +2,10 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import {
   chatWithRepository,
+  findRepositoryById,
   RepositoryNotFoundError,
 } from "@/features/repositories/repository.service";
+import { IngestionStatus } from "@/constants/enums";
 
 const repositoryChatInputSchema = z.object({
   query: z.string().trim().min(1, {
@@ -43,7 +45,21 @@ export async function POST(request: NextRequest, context: RouteContext) {
   }
 
   try {
-    const response = await chatWithRepository(repositoryId, result.data.query);
+    const repository = await findRepositoryById(repositoryId);
+
+    if (!repository) {
+      throw new RepositoryNotFoundError("Repository not found.");
+    }
+
+    if (repository.ingestionStatus !== IngestionStatus.COMPLETED) {
+      return Response.json(
+        {
+          message: "Repository ingestion is not completed yet.",
+        },
+        { status: 409 },
+      );
+    }
+    const response = await chatWithRepository(repository, result.data.query);
 
     return Response.json(response);
   } catch (error) {

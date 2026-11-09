@@ -1,6 +1,11 @@
 "use client";
 
+import { IngestionStatus } from "@/constants/enums";
 import { useState, useRef, useEffect, type SubmitEvent } from "react";
+import { Repository } from "../workspace/AppSidebar";
+import { ingestionStatusStyles } from "../workspace/AppSidebar";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -17,6 +22,9 @@ export function RepositoryChat({ repositoryId }: RepositoryChatProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [repository, setRepository] = useState<Repository | null>(null);
+  const [isRepositoryLoading, setIsRepositoryLoading] = useState(true);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -25,12 +33,39 @@ export function RepositoryChat({ repositoryId }: RepositoryChatProps) {
     });
   }, [messages, isLoading]);
 
+  useEffect(() => {
+    async function fetchRepository() {
+      try {
+        setIsRepositoryLoading(true);
+
+        const response = await fetch(`/api/repositories/${repositoryId}`);
+
+        if (!response.ok) {
+          throw new Error("Failed to fetch repository.");
+        }
+
+        const data: { repository: Repository } = await response.json();
+
+        setRepository(data.repository);
+      } catch (error) {
+        console.error("Failed to fetch repository:", error);
+      } finally {
+        setIsRepositoryLoading(false);
+      }
+    }
+
+    fetchRepository();
+  }, [repositoryId]);
+
+  const isChatEnabled =
+    repository?.ingestionStatus === IngestionStatus.COMPLETED;
+
   async function handleSubmit(event: SubmitEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const question = input.trim();
 
-    if (!question || isLoading) {
+    if (!question || isLoading || !isChatEnabled) {
       return;
     }
 
@@ -39,9 +74,7 @@ export function RepositoryChat({ repositoryId }: RepositoryChatProps) {
       content: question,
     };
 
-    const updatedMessages = [...messages, userMessage];
-
-    setMessages(updatedMessages);
+    setMessages((prevMessages) => [...prevMessages, userMessage]);
     setInput("");
     setError(null);
     setIsLoading(true);
@@ -57,7 +90,7 @@ export function RepositoryChat({ repositoryId }: RepositoryChatProps) {
         }),
       });
 
-      const data: { message?: string; answer?: string; sources?: string } =
+      const data: { message?: string; answer: string; sources?: string } =
         await response.json();
 
       if (!response.ok) {
@@ -68,11 +101,11 @@ export function RepositoryChat({ repositoryId }: RepositoryChatProps) {
         throw new Error("The server returned an empty response.");
       }
 
-      setMessages((currentMessages) => [
-        ...currentMessages,
+      setMessages((prevMessages) => [
+        ...prevMessages,
         {
           role: "assistant",
-          content: data.answer! + data.sources,
+          content: data.answer,
         },
       ]);
     } catch (err) {
@@ -90,6 +123,34 @@ export function RepositoryChat({ repositoryId }: RepositoryChatProps) {
     <section className="flex min-h-0 flex-1 flex-col">
       <div className="border-b border-white/10 px-5 py-4 sm:px-8">
         <h1 className="text-base font-semibold">Repository chat</h1>
+      </div>
+
+      <div className="border-b border-white/10 px-5 py-3 sm:px-8">
+        {isRepositoryLoading ? (
+          <p className="text-xs text-[#a3a3a3]">Loading repository status...</p>
+        ) : repository ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <span
+              className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                ingestionStatusStyles[repository.ingestionStatus].className
+              }`}
+            >
+              {ingestionStatusStyles[repository.ingestionStatus].label}
+            </span>
+
+            <p className="text-xs text-[#a3a3a3]">
+              {repository.ingestionStatus === IngestionStatus.COMPLETED
+                ? "Repository is ready. Start asking questions."
+                : repository.ingestionStatus === IngestionStatus.FAILED
+                  ? "Repository processing failed."
+                  : "Chat will be available once repository processing is complete."}
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-red-400">
+            Could not load repository details. Please refresh the page.
+          </p>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto px-5 py-6 sm:px-8">
@@ -128,9 +189,17 @@ export function RepositoryChat({ repositoryId }: RepositoryChatProps) {
                     {message.role === "user" ? "You" : "DevFlow AI"}
                   </p>
 
-                  <p className="whitespace-pre-wrap break-words text-sm leading-6">
-                    {message.content}
-                  </p>
+                  {message.role === "assistant" ? (
+                    <div className="prose prose-invert prose-sm max-w-none text-sm leading-6 text-[#f2f0eb]">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    <p className="whitespace-pre-wrap break-words text-sm leading-6">
+                      {message.content}
+                    </p>
+                  )}
                 </div>
               </div>
             ))}
@@ -164,16 +233,20 @@ export function RepositoryChat({ repositoryId }: RepositoryChatProps) {
                 event.currentTarget.form?.requestSubmit();
               }
             }}
-            placeholder="Ask a question about this repository..."
+            placeholder={
+              isChatEnabled
+                ? "Ask a question about this repository..."
+                : "Chat is unavailable until ingestion is complete."
+            }
             aria-label="Message"
             rows={2}
-            disabled={isLoading}
-            className="min-h-12 flex-1 resize-y rounded-xl border border-white/15 bg-[#171717] px-4 py-3 text-sm outline-none placeholder:text-[#737373] focus:border-white/30 disabled:opacity-60"
+            disabled={!isChatEnabled || isLoading}
+            className="min-h-12 flex-1 resize-y rounded-xl border border-white/15 bg-[#171717] px-4 py-3 text-sm outline-none placeholder:text-[#737373] focus:border-white/30 disabled:cursor-not-allowed disabled:opacity-60"
           />
 
           <button
             type="submit"
-            disabled={!input.trim() || isLoading}
+            disabled={!input.trim() || isLoading || !isChatEnabled}
             className="rounded-xl bg-[#f2f0eb] px-4 py-3 text-sm font-medium text-[#171717] transition-colors hover:bg-white disabled:cursor-not-allowed disabled:bg-[#333333] disabled:text-[#737373]"
           >
             Send
@@ -189,9 +262,11 @@ export function RepositoryChat({ repositoryId }: RepositoryChatProps) {
           </p>
         )}
 
-        <p className="mx-auto mt-2 max-w-3xl text-xs text-[#737373]">
-          Enter to send · Shift + Enter for a new line
-        </p>
+        {isChatEnabled && (
+          <p className="mx-auto mt-2 max-w-3xl text-xs text-[#737373]">
+            Enter to send · Shift + Enter for a new line
+          </p>
+        )}
       </div>
     </section>
   );

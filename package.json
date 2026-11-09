@@ -8,21 +8,28 @@
     "start": "next start",
     "lint": "eslint",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "worker:chunking": "tsx src/workers/chunking-worker.ts",
+    "worker:embedding": "tsx src/workers/embedding-worker.ts"
   },
   "dependencies": {
     "@google/genai": "^2.24.0",
+    "@tailwindcss/typography": "^0.5.20",
+    "bullmq": "^6.3.16",
     "dotenv": "^18.0.0",
     "drizzle-orm": "^0.45.2",
+    "ioredis": "^6.0.0",
     "next": "16.3.4",
     "postgres": "^3.4.9",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "yauzl": "^3.4.0",
     "zod": "^4.6.0"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
+    "@tailwindcss/postcss": "^4.3.5",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -31,7 +38,8 @@
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.3.4",
-    "tailwindcss": "^4",
+    "tailwindcss": "^4.3.5",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   },
   "packageManager": "pnpm@11.10.0"

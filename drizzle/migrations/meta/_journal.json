@@ -15,6 +15,13 @@
       "when": 1790797151007,
       "tag": "0001_cynical_leader",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793987796153,
+      "tag": "0002_next_boomer",
+      "breakpoints": true
     }
   ]
 }

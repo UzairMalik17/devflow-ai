@@ -1,3 +1,4 @@
+import { IngestionStatus } from "@/constants/enums";
 import { pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 export const repositories = pgTable("repositories", {
@@ -13,6 +14,11 @@ export const repositories = pgTable("repositories", {
 
   htmlUrl: text("html_url").notNull(),
 
+  ingestionStatus: text("ingestion_status")
+    .$type<IngestionStatus>()
+    .notNull()
+    .default(IngestionStatus.PENDING),
+
   createdAt: timestamp("created_at", {
     withTimezone: true,
   })
@@ -25,3 +31,5 @@ export const repositories = pgTable("repositories", {
     .defaultNow()
     .notNull(),
 });
+
+export type Repository = typeof repositories.$inferSelect;
