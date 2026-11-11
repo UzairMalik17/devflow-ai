@@ -2,7 +2,7 @@
   "daemons": {
     "chunking-worker": {
       "root": ".",
-      "entrypoint": "Dockerfile",
+      "entrypoint": "dockerfile",
       "command": ["pnpm", "worker:chunking"],
       "instances": {
         "iad1": 1
@@ -10,7 +10,7 @@
     },
     "embedding-worker": {
       "root": ".",
-      "entrypoint": "Dockerfile",
+      "entrypoint": "dockerfile",
       "command": ["pnpm", "worker:embedding"],
       "instances": {
         "iad1": 1
