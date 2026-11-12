@@ -43,8 +43,8 @@ const worker = new Worker(
   },
 );
 
-worker.on("completed", (job, result) => {
-  console.log(`Chunking job ${job.id} completed:`, result);
+worker.on("completed", (job) => {
+  console.log(`Chunking job ${job.id} completed:`);
 });
 
 worker.on("failed", (job, error) => {

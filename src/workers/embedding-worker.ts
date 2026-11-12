@@ -23,6 +23,7 @@ const worker = new Worker(
       );
 
       if (chunks.length === 0) {
+        console.log("No chunks without embeddings found. Exiting loop.");
         break;
       }
 
@@ -30,7 +31,7 @@ const worker = new Worker(
 
       await storeRepositoryChunkEmbeddings(chunks, embeddings);
 
-      await new Promise((resolve) => setTimeout(resolve, 60_000));
+      await new Promise((resolve) => setTimeout(resolve, 15_000));
     }
 
     await updateRepository(job.data.repositoryId, {

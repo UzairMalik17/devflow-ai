@@ -1,4 +1,4 @@
-import { gemini } from "@/lib/gemini";
+import { gemini } from "@/lib/gemini/llm";
 import { LLM_MODEL } from "./llm.config";
 import { RepositoryChunk } from "../repositories/repository.service";
 
