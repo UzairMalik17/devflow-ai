@@ -78,9 +78,10 @@ export async function generateDocumentEmbeddings(
   return embeddings as number[][];
 }
 
-export async function generateQueryEmbedding(query: string): Promise<number[]> {
-  const apiKey = process.env.GEMINI_API_KEY;
-
+export async function generateQueryEmbedding(
+  query: string,
+  apiKey: string = process.env.GEMINI_API_KEY!,
+): Promise<number[]> {
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not configured.");
   }

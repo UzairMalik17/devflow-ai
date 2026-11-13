@@ -8,6 +8,7 @@ import {
 import { EMBEDDING_BATCH_SIZE } from "@/features/embedding/embedding.config";
 import { generateDocumentEmbeddings } from "@/features/embedding/embedding.service";
 import { IngestionStatus } from "@/constants/enums";
+import { apiKeyRecoveryWorker } from "./api-key-recovery-worker";
 
 const worker = new Worker(
   "repository-embedding",
@@ -66,7 +67,7 @@ console.log("Embedding worker is waiting for jobs...");
 async function shutdown(signal: string) {
   console.log(`${signal} received. Closing embedding worker...`);
 
-  await worker.close();
+  await Promise.all([worker.close(), apiKeyRecoveryWorker.close()]);
   await redisConnection.quit();
 
   console.log("Embedding worker shut down cleanly.");

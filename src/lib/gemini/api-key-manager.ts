@@ -8,10 +8,6 @@ export function createGeminiApiKeyManager(initialKeys: GeminiApiKey[]) {
   const apiKeys = [...initialKeys];
   let currentIndex = 0;
 
-  //   function getNextAvailableApiKey() {
-  //     // We'll implement this next.
-  //   }
-
   function getNextAvailableApiKey(): SelectedApiKey | null {
     if (apiKeys.length === 0) {
       return null;
@@ -34,10 +30,6 @@ export function createGeminiApiKeyManager(initialKeys: GeminiApiKey[]) {
     return null;
   }
 
-  //   function markApiKeyUnavailable(apiKeyId: string, error: ApiKeyError) {
-  //     // We'll implement this next.
-  //   }
-
   function markApiKeyUnavailable(apiKeyId: string, error: ApiKeyError): void {
     const keyIndex = apiKeys.findIndex((key) => key.id === apiKeyId);
 
@@ -54,9 +46,6 @@ export function createGeminiApiKeyManager(initialKeys: GeminiApiKey[]) {
     };
   }
 
-  //   function markApiKeyAvailable(apiKeyId: string) {
-  //     // We'll implement this next.
-  //   }
   function markApiKeyAvailable(apiKeyId: string): void {
     const keyIndex = apiKeys.findIndex((key) => key.id === apiKeyId);
 
@@ -72,10 +61,6 @@ export function createGeminiApiKeyManager(initialKeys: GeminiApiKey[]) {
       status: "available",
     };
   }
-
-  //   function getApiKeyStatus() {
-  //     // We'll implement this next.
-  //   }
 
   function getApiKeyStatus() {
     return apiKeys.map((key) => {
@@ -94,10 +79,33 @@ export function createGeminiApiKeyManager(initialKeys: GeminiApiKey[]) {
     });
   }
 
+  function getNextUnavailableApiKey(): SelectedApiKey | null {
+    if (apiKeys.length === 0) {
+      return null;
+    }
+
+    for (let i = 0; i < apiKeys.length; i++) {
+      const index = (currentIndex + i) % apiKeys.length;
+      const key = apiKeys[index];
+
+      if (key.status === "unavailable") {
+        currentIndex = (index + 1) % apiKeys.length;
+
+        return {
+          id: key.id,
+          apiKey: key.apiKey,
+        };
+      }
+    }
+
+    return null;
+  }
+
   return {
     getNextAvailableApiKey,
     markApiKeyUnavailable,
     markApiKeyAvailable,
     getApiKeyStatus,
+    getNextUnavailableApiKey,
   };
 }
