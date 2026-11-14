@@ -8,6 +8,7 @@ import {
 import { EMBEDDING_BATCH_SIZE } from "@/features/embedding/embedding.config";
 import { generateDocumentEmbeddings } from "@/features/embedding/embedding.service";
 import { IngestionStatus } from "@/constants/enums";
+import { apiKeyRecoveryWorker } from "./api-key-recovery-worker";
 
 const worker = new Worker(
   "repository-embedding",
@@ -23,6 +24,7 @@ const worker = new Worker(
       );
 
       if (chunks.length === 0) {
+        console.log("No chunks without embeddings found. Exiting loop.");
         break;
       }
 
@@ -30,7 +32,7 @@ const worker = new Worker(
 
       await storeRepositoryChunkEmbeddings(chunks, embeddings);
 
-      await new Promise((resolve) => setTimeout(resolve, 60_000));
+      await new Promise((resolve) => setTimeout(resolve, 15_000));
     }
 
     await updateRepository(job.data.repositoryId, {
@@ -65,7 +67,7 @@ console.log("Embedding worker is waiting for jobs...");
 async function shutdown(signal: string) {
   console.log(`${signal} received. Closing embedding worker...`);
 
-  await worker.close();
+  await Promise.all([worker.close(), apiKeyRecoveryWorker.close()]);
   await redisConnection.quit();
 
   console.log("Embedding worker shut down cleanly.");

@@ -16,5 +16,11 @@
         "iad1": 1
       }
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/gemini-key-recovery",
+      "schedule": "10 8 * * *"
+    }
+  ]
 }

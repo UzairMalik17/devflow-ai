@@ -1,3 +1,4 @@
+import { embeddingApiKeyManager } from "@/lib/gemini/embedding-key-manager";
 import { RepositoryChunk } from "../repositories/repository.service";
 import {
   EMBEDDING_BATCH_SIZE,
@@ -24,10 +25,10 @@ export async function generateDocumentEmbeddings(
     );
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = embeddingApiKeyManager.getNextAvailableApiKey()?.apiKey;
 
   if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not configured.");
+    throw new Error("No available Gemini embedding API key.");
   }
 
   const response = await fetch(
@@ -77,9 +78,10 @@ export async function generateDocumentEmbeddings(
   return embeddings as number[][];
 }
 
-export async function generateQueryEmbedding(query: string): Promise<number[]> {
-  const apiKey = process.env.GEMINI_API_KEY;
-
+export async function generateQueryEmbedding(
+  query: string,
+  apiKey: string = process.env.GEMINI_API_KEY!,
+): Promise<number[]> {
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not configured.");
   }
